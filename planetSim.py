@@ -43,12 +43,12 @@ def OldInput():
                 rotateToggle = 1
 
             if event.button == 4:
-                glTranslatef(0,0,10.0)
-                #glScalef(1.1,1.1,1.1)
+                #glTranslatef(0,0,10.0)
+                glScalef(1.1,1.1,1.1)
 
             if event.button == 5:
-                glTranslatef(0,0,-10.0)
-                #glScalef(0.9,0.9,0.9)
+                #glTranslatef(0,0,-10.0)
+                glScalef(0.9,0.9,0.9)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 4:
@@ -92,7 +92,10 @@ def NewInput():
 
             if event.button == 4:
                 glTranslatef(0,0,20.0)
+                #glPushMatrix()
+                #glLoadIdentity()
                 #glScalef(1.1,1.1,1.1)
+                #glPopMatrix()
 
             if event.button == 5:
                 glTranslatef(0,0,-20.0)
@@ -153,16 +156,16 @@ class Sphere(object):
 
 
 
-def set_placement(texture, max_distance, min_distance = -20, camera_x = 0, camera_y = 0):
+def set_placement(texture, MAX_RENDER_DISTANCE, min_distance = -20, camera_x = 0, camera_y = 0):
 
     camera_x = -1*int(camera_x)
     camera_y = -1*int(camera_y)
 
     new_placement = [0,0,0,0,0]
     
-    new_placement[0] = random.randrange(camera_x-150,camera_x+150)
-    new_placement[1] = random.randrange(camera_y-150,camera_y+150)
-    new_placement[2] = random.randrange(-1*max_distance,min_distance)
+    new_placement[0] = random.randrange(camera_x-800,camera_x+800)
+    new_placement[1] = random.randrange(camera_y-800,camera_y+800)
+    new_placement[2] = random.randrange(-1*MAX_RENDER_DISTANCE,min_distance)
     new_placement[3] = texture
     new_placement[4] = random.randrange(0,30)
 
@@ -204,12 +207,15 @@ def main():
     pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
     
     glEnable(GL_DEPTH_TEST)
-    glDepthFunc(GL_LESS)
+    glDepthFunc(GL_LEQUAL) #These add weird clipping, was GL_LESS
 
-    max_distance = 5000
+    NEAR_CLIP_DISTANCE = 0.01
+    FAR_CLIP_DISTANCE = 1000000
+    MAX_RENDER_DISTANCE = 1600
+    FIELD_OF_VIEW = 60
     
     glMatrixMode(GL_PROJECTION)
-    gluPerspective(45, (display[0]/display[1]), 0.1, 5000000)
+    gluPerspective(FIELD_OF_VIEW, (display[0]/display[1]), NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE)
     glTranslatef(0,0, -40)
 
     x_move = 0
@@ -237,7 +243,7 @@ def main():
     sphere_list = []
 
     for x in range(100):
-        sphere_list.append(set_placement(bodies[random.randrange(0,len(bodies))],max_distance))
+        sphere_list.append(set_placement(bodies[random.randrange(0,len(bodies))],MAX_RENDER_DISTANCE))
     
     sphere_list.sort(key=lambda x: x[2])
 
@@ -259,6 +265,8 @@ def main():
         cur_x += x_move
         cur_y += y_move
 
+        Sphere([0,0,0,background,100000])
+
         glTranslatef(x_move,y_move,game_speed)
 
 
@@ -267,9 +275,9 @@ def main():
 
         for i,each_sphere in enumerate(sphere_list):
             if camera_z <= each_sphere[2]:
-                new_max = int(-1*(camera_z-(max_distance*2)))
-                #sphere_list.append(set_placement(bodies[random.randrange(0,len(bodies))],new_max,int(camera_z-max_distance), cur_x, cur_y))
-                sphere_list[i] = set_placement(bodies[random.randrange(0,len(bodies))],new_max,int(camera_z-max_distance), cur_x, cur_y)   
+                new_max = int(-1*(camera_z-(MAX_RENDER_DISTANCE*2)))
+                #sphere_list.append(set_placement(bodies[random.randrange(0,len(bodies))],new_max,int(camera_z-MAX_RENDER_DISTANCE), cur_x, cur_y))
+                sphere_list[i] = set_placement(bodies[random.randrange(0,len(bodies))],new_max,int(camera_z-MAX_RENDER_DISTANCE), cur_x, cur_y)   
         
         sphere_list.sort(key=lambda x: x[2])
 

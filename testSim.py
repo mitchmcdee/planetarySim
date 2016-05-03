@@ -1,143 +1,106 @@
-import pygame
-from pygame.locals import *
-
+import sys
+from math import sin, cos
+from random import randint
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from OpenGL.GLUT import *
+#angle of rotation
+xpos= ypos= zpos= xrot= yrot= angle= lastx= lasty = 0
 
-verticies = (
-    (1, -1, -1),
-    (1, 1, -1),
-    (-1, 1, -1),
-    (-1, -1, -1),
-    (1, -1, 1),
-    (1, 1, 1),
-    (-1, -1, 1),
-    (-1, 1, 1)
-    )
+#positions of the cubes
+positionz = []
+positionx = []
 
-edges = (
-    (0,1),
-    (0,3),
-    (0,4),
-    (2,1),
-    (2,3),
-    (2,7),
-    (6,3),
-    (6,4),
-    (6,7),
-    (5,1),
-    (5,4),
-    (5,7)
-    )
+def init():
+    global positionz, positionx
+    glEnable(GL_DEPTH_TEST) #enable the depth testing
+    glEnable(GL_LIGHTING) #enable the lighting
+    glEnable(GL_LIGHT0) #enable LIGHT0, our Diffuse Light
+    glShadeModel(GL_SMOOTH) #set the shader to smooth shader
 
+    positionx = [randint(0, 10) for x in range(10)]
+    positionz = [randint(0, 10) for x in range(10)]
 
-def Cube():
-    glBegin(GL_LINES)
-    for edge in edges:
-        for vertex in edge:
-            glVertex3fv(verticies[vertex])
-    glEnd()
+def camera():
+    global xrot, yrot, xpos, ypos, zpos
+    glRotatef(xrot,1.0,0.0,0.0)  #rotate our camera on teh x-axis (left and right)
+    glRotatef(yrot,0.0,1.0,0.0)  #rotate our camera on the y-axis (up and down)
+    glTranslated(-xpos,-ypos,-zpos) #translate the screen to the position of our camera
 
-rotateToggle = 0
-keyDown = []
-
-def NewInput():
-    global rotateToggle
-    global keyDown
-
-    for event in pygame.event.get():
-        print(event)
-
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            quit()
-
-        if event.type == pygame.KEYDOWN:
-            keyDown.append(event.key)
-
-        if event.type == pygame.KEYUP:
-            keyDown.remove(event.key)
-
-        if event.type == pygame.MOUSEMOTION and rotateToggle:
-            relx, rely = event.rel
-            if relx != 0:
-                glRotatef(relx/10.0,0.0,1.0,0.0)
-
-            if rely != 0:
-                glRotatef(rely/10.0,1.0,0.0,0.0)
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                rotateToggle = 0
-
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                rotateToggle = 1
-
-            if event.button == 4:
-                #glTranslatef(0,0,1.0)
-                glScalef(1.1,1.1,1.1)
-
-            if event.button == 5:
-                #glTranslatef(0,0,-1.0)
-                glScalef(0.9,0.9,0.9)
-
-    #move out into action method?
-    for key in keyDown:
-        pygame.time.delay(10)
-        if key == pygame.K_RIGHT:
-            glTranslatef(-1,0,0)
-        if key == pygame.K_LEFT:
-            glTranslatef(1,0,0)
-        if key == pygame.K_DOWN:
-            glTranslatef(0,1,0)
-        if key == pygame.K_UP:
-            glTranslatef(0,-1,0)
-
-
-def resetDisplay():
- 
-    glClearColor (0.0,0.0,0.0,1.0)
-    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT )
- 
-    glDisable(GL_DEPTH_TEST)
-    glMatrixMode(GL_PROJECTION);
+def display():
+    global angle
+    glClearColor(0.0,0.0,0.0,1.0) #clear the screen to black
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) #clear the color buffer and the depth buffer
     glLoadIdentity()
-    glOrtho(0.0, 800.0, 600.0, 0.0, 0.0, 1.0)
- 
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, texture)
- 
-    glBegin (GL_QUADS);
-    glTexCoord2d(0.0,0.0); glVertex2d(0.0,0.0);
-    glTexCoord2d(1.0,0.0); glVertex2d(1024.0,0.0);
-    glTexCoord2d(1.0,1.0); glVertex2d(1024.0,512.0);
-    glTexCoord2d(0.0,1.0); glVertex2d(0.0,512.0);
-    glEnd();
+    camera()
+    for x in range(10):
+        glPushMatrix()
+        glTranslated(-positionx[x] * 10, 0, -positionz[x] * 10) #translate the cube
+        glutSolidCube(2) #draw the cube
+        glPopMatrix()
+    glutSwapBuffers() #swap the buffers
+    angle += angle #increase the angle
 
+def reshape(w, h):
+    glViewport(0, 0, w, h); #set the viewport to the current window specifications
+    glMatrixMode(GL_PROJECTION); #set the matrix to projection
 
-def main():
-    pygame.init()
-    display = (800,600)
-    pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
+    glLoadIdentity();
+    gluPerspective(60, w / h, 1.0, 1000.0)
+    #set the perspective (angle of sight, width, height, , depth)
+    glMatrixMode(GL_MODELVIEW); #set the matrix back to model
 
-    gluPerspective(45, (display[0]/display[1]), 0.1, 50.0)
+def keyboard (key, x, y):
+    global xrot, xpos, ypos, zpos, xrot, yrot, angle, lastx, lasty, positionz, positionx
+    if (key=='q'):
+        xrot += 1
+        if (xrot >360):
+            xrot -= 360
+    if (key=='z'):
+        xrot -= 1;
+        if (xrot < -360): xrot += 360
+    if (key=='w'):
+        yrotrad = (yrot / 180 * 3.141592654)
+        xrotrad = (xrot / 180 * 3.141592654)
+        xpos += float(sin(yrotrad))
+        zpos -= float(cos(yrotrad))
+        ypos -= float(sin(xrotrad))
+    if (key=='s'):
+        yrotrad = (yrot / 180 * 3.141592654)
+        xrotrad = (xrot / 180 * 3.141592654)
+        xpos -= float(sin(yrotrad))
+        zpos += float(cos(yrotrad))
+        ypos += float(sin(xrotrad))
+    if (key=='d'):
+        yrotrad = (yrot / 180 * 3.141592654)
+        xpos += float(cos(yrotrad)) * 0.2
+        zpos += float(sin(yrotrad)) * 0.2
+    if (key=='a'):
+        yrotrad = (yrot / 180 * 3.141592654)
+        xpos -= float(cos(yrotrad)) * 0.2
+        zpos -= float(sin(yrotrad)) * 0.2
+    if (key==27):
+        sys.exit(0)
 
-    glTranslatef(0,0, -10)
+def mouseMovement(x, y):
+    global lastx, lasty, xrot, yrot
+    diffx=x-lastx #check the difference between the current x and the last x position
+    diffy=y-lasty #check the difference between the current y and the last y position
+    lastx=x #set lastx to the current x position
+    lasty=y #set lasty to the current y position
+    xrot += float(diffy) #set the xrot to xrot with the addition of the difference in the y position
+    yrot += float(diffx) #set the xrot to yrot with the addition of the difference in the x position
 
-    while True:
-        
-        resetDisplay()
-
-        NewInput()
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-        Cube()
-        glTranslatef(0,0, -10)
-        Cube()
-        glTranslatef(0,0, -10)
-        Cube()
-        glTranslatef(0,0, 20)
-        pygame.display.flip()
-        pygame.time.wait(10)
-
-main()
+glutInit()
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH)
+glutInitWindowSize(500, 500)
+glutInitWindowPosition (100, 100)
+glutCreateWindow("A basic OpenGL Window")
+init()
+glutDisplayFunc(display)
+glutIdleFunc(display)
+glutReshapeFunc(reshape)
+#glutPassiveMotionFunc(mouseMovement)
+#check for mouse movement
+glutKeyboardFunc (keyboard)
+glutMainLoop()
