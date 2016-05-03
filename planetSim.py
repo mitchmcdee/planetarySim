@@ -23,7 +23,7 @@ NEAR_CLIP_DISTANCE = 0.01
 FAR_CLIP_DISTANCE = 1000000
 RENDER_DISTANCE = 10000
 FIELD_OF_VIEW = 45
-NUM_RENDER_LINES = 80
+NUM_RENDER_LINES = 100
 
 def NewInput():
     global rotateToggle, keyDown, speedZoomToggle
@@ -211,17 +211,17 @@ def main():
     sphere_list = []
     bodies = []
 
-    background = TextureFromImage(os.path.join("images","bg.png"))
+    background = TextureFromImage(os.path.join("textures","bg.png"))
 
-    bodies.append(TextureFromImage(os.path.join("images","planet1.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet2.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet3.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet4.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet5.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet6.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet7.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet8.png")))
-    bodies.append(TextureFromImage(os.path.join("images","planet9.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet1.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet2.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet3.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet4.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet5.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet6.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet7.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet8.png")))
+    bodies.append(TextureFromImage(os.path.join("textures","planet9.png")))
 
 
     #generate spheres TODO(mitch): add in random chance for moon, add in clusters?
