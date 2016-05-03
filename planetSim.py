@@ -50,10 +50,10 @@ def NewInput():
         if event.type == pygame.MOUSEMOTION and rotateToggle:
             relx, rely = event.rel
             if relx != 0:
-                glRotatef(relx/5.0,0.0,1.0,0.0)
+                glRotatef(relx/5.0, 0.0, 1.0, 0.0)
 
             if rely != 0:
-                glRotatef(rely/5.0,1.0,0.0,0.0)
+                glRotatef(rely/5.0, 1.0, 0.0, 0.0)
 
         if event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
@@ -65,32 +65,27 @@ def NewInput():
 
             if event.button == 4:
                 if speedZoomToggle:
-                    glTranslatef(0,0,200.0)
+                    glTranslatef(0, 0, 200.0)
                 else:
-                    glTranslatef(0,0,20.0)
-                #glPushMatrix()
-                #glLoadIdentity()
-                #glScalef(1.1,1.1,1.1)
-                #glPopMatrix()
+                    glTranslatef(0, 0, 20.0)
 
             if event.button == 5:
                 if speedZoomToggle:
-                    glTranslatef(0,0,-200.0)
+                    glTranslatef(0, 0, -200.0)
                 else:
-                    glTranslatef(0,0,-20.0)
-                #glScalef(0.9,0.9,0.9)
+                    glTranslatef(0, 0, -20.0)
 
     #move out into action method?
     for key in keyDown:
         pygame.time.delay(10)
         if key == pygame.K_RIGHT:
-            glTranslatef(-20,0,0)
+            glTranslatef(-20, 0, 0)
         if key == pygame.K_LEFT:
-            glTranslatef(20,0,0)
+            glTranslatef(20, 0, 0)
         if key == pygame.K_DOWN:
-            glTranslatef(0,20,0)
+            glTranslatef(0, 20, 0)
         if key == pygame.K_UP:
-            glTranslatef(0,-20,0)
+            glTranslatef(0, -20, 0)
         
 
 def TextureFromImage(filename):
@@ -107,7 +102,8 @@ def TextureFromImage(filename):
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.size[0], img.size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.size[0], \
+            img.size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
     return texture
 
 def Sphere(placement):
@@ -132,27 +128,24 @@ def Sphere(placement):
 
     glTranslatef(-x_pos, -y_pos, -z_pos)
 
-def biasRandom(massDist):
-    randRoll = random.random() # in [0,1)
-    sum = 0
-    result = 1
-    for mass in massDist:
-        sum += mass
-        if randRoll < sum:
-            return result
-        result+=1
 
 #TODO(mitch): Add in ability to have absolute placement?
 def set_placement(texture, render_distance, absolute = False):
     global MAX_BODY_RADIUS
     new_placement = []
     
-    new_placement.append(random.randrange(-(render_distance / 2),(render_distance / 2)))
-    new_placement.append(random.randrange(-(render_distance / 2),(render_distance / 2)))
-    new_placement.append(random.randrange(-(render_distance / 2),(render_distance / 2)))
+    #fix up multi lines?
+
+    new_placement.append(random.randrange(-(render_distance / 2), \
+            (render_distance / 2)))
+    new_placement.append(random.randrange(-(render_distance / 2), \
+            (render_distance / 2)))
+    new_placement.append(random.randrange(-(render_distance / 2), \
+            (render_distance / 2)))
     new_placement.append(texture)
     #inverse transform sampling to the 10th root.
-    new_placement.append(MAX_BODY_RADIUS * (1 - (1 - random.random())**(1.0/10.0)))
+    new_placement.append(MAX_BODY_RADIUS * \
+            (1 - (1 - random.random())**(1.0/10.0)))
 
     return new_placement
 
@@ -187,8 +180,8 @@ def resetDisplay(texture):
 
 
 def main():
-    global RENDER_DISTANCE, FIELD_OF_VIEW, NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE, \
-            NUM_BODIES, BACKGROUND_SPHERE_RADIUS
+    global RENDER_DISTANCE, FIELD_OF_VIEW, NEAR_CLIP_DISTANCE, \
+            FAR_CLIP_DISTANCE, NUM_BODIES, BACKGROUND_SPHERE_RADIUS
 
     #TODO(mitch): make init method?
 
@@ -200,7 +193,8 @@ def main():
     glDepthFunc(GL_ALWAYS)
     
     glMatrixMode(GL_PROJECTION)
-    gluPerspective(FIELD_OF_VIEW, (display[0]/display[1]), NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE)
+    gluPerspective(FIELD_OF_VIEW, (display[0] / display[1]), \
+            NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE)
     
     #Starting view position
     #glTranslatef(0,0, RENDER_DISTANCE / 2)
@@ -224,11 +218,14 @@ def main():
     bodies.append(TextureFromImage(os.path.join("textures","planet9.png")))
 
 
-    #generate spheres TODO(mitch): add in random chance for moon, add in clusters?
+    #generate spheres
+    #TODO(mitch): add in random chance for moon, add in clusters?
     for x in range(NUM_BODIES):
-        sphere_list.append(set_placement(bodies[random.randrange(0,len(bodies))], RENDER_DISTANCE))
+        sphere_list.append(set_placement( \
+                bodies[random.randrange(0,len(bodies))], RENDER_DISTANCE))
     
-    #Sort spheres in order of their z-distance TODO(mitch): change to distance from cam?
+    #Sort spheres in order of their z-distance
+    #TODO(mitch): change to distance from cam?
     sphere_list.sort(key=lambda x: x[2])
 
     while True:
