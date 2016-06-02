@@ -5,44 +5,97 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 from PIL import Image
+from math import *
 import numpy
 import random
 import os
 os.chdir('/Users/mcdee/Uni/COSC3000/Planet Simulator/')
 
-#Global variables
+##########################################################################
+# Global constants, DON'T CHANGE THESE UNLESS YOU KNOW WHAT YOU'RE DOING #
+##########################################################################
+
+BACKGROUND_SPHERE_RADIUS = 100000
+WINDOW_RES = (1440, 900) #window resolution of the window
+NEAR_CLIP_DISTANCE = 0.01 #near clipping distance
+FAR_CLIP_DISTANCE = 100000 #far clipping distance
+NUM_RENDER_LINES = 100 #number of render lines per sphere (both slice and stack)
+FIELD_OF_VIEW = 45 #field of view for the viewing camera
+
+##################################################
+# Global constants, CHANGE THESE ALL YOU LIKE :) #
+##################################################
+
+RENDER_DISTANCE = 400 #length and width of the 2D square that celestial bodies will generate in
+SIZE_FACTOR = 1.0 / 3.0 #size bias factor (lower number, less large radius planets)
+MASS_FACTOR = 1.0 / 5.0 #mass bias factor (lower number, less large mass planets)
+MAX_BODY_RADIUS = 3 #maximum radius of celestial bodies
+MAX_BODY_MASS = 400 #maximum mass of celestial bodies
+NUM_BODIES = 60 #number of celestial bodies (advised limit: 200)
+
+
+
+
+#Global variables, DO NOT TOUCH
+backgroundToggle = 0
 speedZoomToggle = 0
 rotateToggle = 0
 keyDown = []
+bodies = []
+sphere_list = []
+t, dt = 0., .0005 #3 is good
 
-#Global constants
-BACKGROUND_SPHERE_RADIUS = 100000
-NUM_BODIES = 200
-MAX_BODY_RADIUS = 300
-NEAR_CLIP_DISTANCE = 0.01
-FAR_CLIP_DISTANCE = 1000000
-RENDER_DISTANCE = 10000
-FIELD_OF_VIEW = 45
-NUM_RENDER_LINES = 100
+# The density of the planets - used to calculate their mass
+# from their volume (i.e. via their radius)
+DENSITY = 0.01 #0.001
 
-def NewInput():
-    global rotateToggle, keyDown, speedZoomToggle
+# The gravity coefficient
+GRAVITYSTRENGTH = 2.e8 #1.e2 is good
+
+class State:
+    """Class representing position and velocity."""
+    def __init__(self, x, y, vx, vy):
+        self._x, self._y, self._vx, self._vy = x, y, vx, vy
+
+    def __repr__(self):
+        return 'x:{x} y:{y} vx:{vx} vy:{vy}'.format(
+            x=self._x, y=self._y, vx=self._vx, vy=self._vy)
+
+
+class Derivative:
+    """Class representing velocity and acceleration."""
+    def __init__(self, dx, dy, dvx, dvy):
+        self._dx, self._dy, self._dvx, self._dvy = dx, dy, dvx, dvy
+
+    def __repr__(self):
+        return 'dx:{dx} dy:{dy} dvx:{dvx} dvy:{dvy}'.format(
+            dx=self._dx, dy=self._dy, dvx=self._dvx, dvy=self._dvy)
+
+def GetInput(sphere_list, blackhole):
+    global rotateToggle, keyDown, speedZoomToggle, dt, backgroundToggle
 
     for event in pygame.event.get():
-        print(event)
+        #print(event)
 
         if event.type == pygame.QUIT:
             pygame.quit()
             quit()
 
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LSHIFT:
+            if event.key == pygame.K_t:
+                backgroundToggle = not backgroundToggle
+            elif event.key == pygame.K_q:
+                pygame.quit()
+                quit()
+            elif event.key == pygame.K_LSHIFT:
                 speedZoomToggle = 1
             else:
                 keyDown.append(event.key)
 
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_LSHIFT:
+            if event.key == pygame.K_t:
+                continue
+            elif event.key == pygame.K_LSHIFT:
                 speedZoomToggle = 0
             else:
                 keyDown.remove(event.key)
@@ -65,27 +118,45 @@ def NewInput():
 
             if event.button == 4:
                 if speedZoomToggle:
-                    glTranslatef(0, 0, 200.0)
-                else:
                     glTranslatef(0, 0, 20.0)
+                else:
+                    glTranslatef(0, 0, 2.0)
 
             if event.button == 5:
                 if speedZoomToggle:
-                    glTranslatef(0, 0, -200.0)
-                else:
                     glTranslatef(0, 0, -20.0)
+                else:
+                    glTranslatef(0, 0, -2.0)
 
-    #move out into action method?
+    #move out into action method? or move back in ^^ ?
     for key in keyDown:
         pygame.time.delay(10)
         if key == pygame.K_RIGHT:
-            glTranslatef(-20, 0, 0)
+            glTranslatef(-2, 0, 0)
         if key == pygame.K_LEFT:
-            glTranslatef(20, 0, 0)
+            glTranslatef(2, 0, 0)
         if key == pygame.K_DOWN:
-            glTranslatef(0, 20, 0)
+            glTranslatef(0, 2, 0)
         if key == pygame.K_UP:
-            glTranslatef(0, -20, 0)
+            glTranslatef(0, -2, 0)
+        if key == pygame.K_w:
+            if (dt == 0):
+                pygame.time.delay(1000)
+            elif (dt >= -0.001):
+                dt += 0.0001
+            else:
+                dt += 0.001
+        if key == pygame.K_s:
+            if (dt == 0):
+                pygame.time.delay(1000)
+            elif (dt <= 0.001):
+                dt -= 0.0001
+            else:
+                dt -= 0.001
+        if key == pygame.K_m:
+            sphere_list.append(Sphere())
+
+
         
 
 def TextureFromImage(filename):
@@ -95,158 +166,228 @@ def TextureFromImage(filename):
     texture = glGenTextures(1)
     glPixelStorei(GL_UNPACK_ALIGNMENT,1)
     glBindTexture(GL_TEXTURE_2D, texture)
-
-    # Texture parameters are part of the texture object, so you need to 
-    # specify them only once for a given texture object.
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.size[0], \
-            img.size[1], 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST) #trilinear filtering
+    gluBuild2DMipmaps(GL_TEXTURE_2D,3, img.size[0], img.size[1], GL_RGB, GL_UNSIGNED_BYTE, img_data
+    )
     return texture
 
-def Sphere(placement):
-    global NUM_RENDER_LINES
-    """Draws a centered sphere with radius s in given color."""
-
-    x_pos = placement[0]
-    y_pos = placement[1]
-    z_pos = placement[2]
-    texture = placement[3]
-    radius = placement[4]
-
-    glTranslatef(x_pos, y_pos, z_pos)
-
-    quad = gluNewQuadric()
-    gluQuadricNormals(quad, GLU_SMOOTH)
-    gluQuadricTexture(quad, GL_TRUE)
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, texture)
-    gluSphere(quad, radius, NUM_RENDER_LINES, NUM_RENDER_LINES)
-    glDisable(GL_TEXTURE_2D)
-
-    glTranslatef(-x_pos, -y_pos, -z_pos)
 
 
-#TODO(mitch): Add in ability to have absolute placement?
-def set_placement(texture, render_distance, absolute = False):
-    global MAX_BODY_RADIUS
-    new_placement = []
+class Sphere():
+    def __init__(self, texture = None, x_pos = None, \
+            z_pos = None, radius = None, mass = None):
+
+        global bodies, RENDER_DISTANCE, SIZE_FACTOR, MASS_FACTOR, \
+                MAX_BODY_RADIUS
+
+        if (texture == None):
+            texture = bodies[random.randrange(0,len(bodies))]
+
+        if (x_pos == None):
+            x_pos = random.randrange(-(RENDER_DISTANCE / 2), \
+            (RENDER_DISTANCE / 2))
+
+        if (z_pos == None):
+            z_pos = random.randrange(-(RENDER_DISTANCE / 2), \
+            (RENDER_DISTANCE / 2))
+
+        if (radius == None):
+            radius = MAX_BODY_RADIUS * \
+            (1 - (1 - max(random.random(), 0.3))**(SIZE_FACTOR))
+
+        if (mass == None):
+            mass = MAX_BODY_MASS * \
+            (1 - (1 - max(random.random(), 0.3))**(MASS_FACTOR))
+
+        self._r = radius;
+        self._st = State(
+               float(x_pos),
+               float(z_pos),
+               float(-0.01 + random.randint(0, 1)/100.), #velocity x
+               float(-0.01 + random.randint(0, 1)/100.)) #velocity y
+
+        self._text = texture
+        self.setMassFromRadius()
+        self._merged = False
+
+    def __repr__(self):
+        return repr(self._st)
+
+    def acceleration(self, state, unused_t):
+        """Calculate acceleration caused by other planets on this one."""
+        ax = 0.0
+        ay = 0.0
+        for p in sphere_list:
+            if p is self or p._merged:
+                continue  # ignore ourselves and merged planets
+            dx = p._st._x - state._x
+            dy = p._st._y - state._y
+            dsq = dx*dx + dy*dy  # distance squared
+            dr = sqrt(dsq)  # distance
+            force = GRAVITYSTRENGTH*self._m*p._m/dsq if dsq>1e-10 else 0.
+            # Accumulate acceleration...
+            ax += force*dx/dr
+            ay += force*dy/dr
+        return (ax, ay)
+
+    def initialDerivative(self, state, t):
+        """Part of Runge-Kutta method."""
+        ax, ay = self.acceleration(state, t)
+        return Derivative(state._vx, state._vy, ax, ay)
+
+    def nextDerivative(self, initialState, derivative, t, dt):
+        """Part of Runge-Kutta method."""
+        state = State(0., 0., 0., 0.)
+        state._x = initialState._x + derivative._dx*dt
+        state._y = initialState._y + derivative._dy*dt
+        state._vx = initialState._vx + derivative._dvx*dt
+        state._vy = initialState._vy + derivative._dvy*dt
+        ax, ay = self.acceleration(state, t+dt)
+        return Derivative(state._vx, state._vy, ax, ay)
+
+    def updatePlanet(self, t, dt):
+        """Runge-Kutta 4th order solution to update planet's pos/vel."""
+        a = self.initialDerivative(self._st, t)
+        b = self.nextDerivative(self._st, a, t, dt*0.5)
+        c = self.nextDerivative(self._st, b, t, dt*0.5)
+        d = self.nextDerivative(self._st, c, t, dt)
+        dxdt = 1.0/6.0 * (a._dx + 2.0*(b._dx + c._dx) + d._dx)
+        dydt = 1.0/6.0 * (a._dy + 2.0*(b._dy + c._dy) + d._dy)
+        dvxdt = 1.0/6.0 * (a._dvx + 2.0*(b._dvx + c._dvx) + d._dvx)
+        dvydt = 1.0/6.0 * (a._dvy + 2.0*(b._dvy + c._dvy) + d._dvy)
+        self._st._x += dxdt*dt
+        self._st._y += dydt*dt
+        self._st._vx += dvxdt*dt
+        self._st._vy += dvydt*dt
+        if abs(self._st._x) > 500 or abs(self._st._y) > 500:
+            self._merged = True
+
+    def drawSphere(self):
+        glTranslatef(self._st._x, 0, self._st._y)
+
+        quad = gluNewQuadric()
+        gluQuadricNormals(quad, GLU_SMOOTH)
+        gluQuadricTexture(quad, GL_TRUE)
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, self._text)
+        gluSphere(quad, self._r, NUM_RENDER_LINES, NUM_RENDER_LINES)
+        glDisable(GL_TEXTURE_2D)
+
+        glTranslatef(-self._st._x, 0, -self._st._y)
+
+    def setMassFromRadius(self):
+        """From _r, set _m: The volume is (4/3)*Pi*(r^3)..."""
+        self._m = DENSITY*4.*pi*(self._r**3.)/3.
+
+    def setRadiusFromMass(self):
+        """Reversing the setMassFromRadius formula, to calculate radius from
+        mass (used after merging of two planets - mass is added, and new
+        radius is calculated from this)"""
+        self._r = (3.*self._m/(DENSITY*4.*pi))**(0.3333)
+
+
+def initialise():
+    global bodies, RENDER_DISTANCE, FIELD_OF_VIEW, NEAR_CLIP_DISTANCE, \
+            FAR_CLIP_DISTANCE, WINDOW_RES
+
+    pygame.init()
+    pygame.display.set_mode(WINDOW_RES, DOUBLEBUF|OPENGL|NOFRAME);
     
-    #fix up multi lines?
+    glMatrixMode(GL_PROJECTION)
+    gluPerspective(FIELD_OF_VIEW, (WINDOW_RES[0] / WINDOW_RES[1]), \
+            NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE)
 
-    new_placement.append(random.randrange(-(render_distance / 2), \
-            (render_distance / 2)))
-    new_placement.append(random.randrange(-(render_distance / 2), \
-            (render_distance / 2)))
-    new_placement.append(random.randrange(-(render_distance / 2), \
-            (render_distance / 2)))
-    new_placement.append(texture)
-    #inverse transform sampling to the 10th root.
-    new_placement.append(MAX_BODY_RADIUS * \
-            (1 - (1 - random.random())**(1.0/10.0)))
+    #loop through textures folder and grab all body textures.
+    for file in os.listdir("textures"):
+        if file.startswith("body") and file.endswith(".png"):
+            bodies.append(TextureFromImage(os.path.join("textures",file)))
 
-    return new_placement
-
-
-def resetDisplay(texture):
- 
-    glClearColor (0.0,0.0,0.0,1.0)
-    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT )
- 
-    glDisable(GL_DEPTH_TEST)
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity()
-    glOrtho(0.0, 800.0, 600.0, 0.0, 0.0, 1.0)
- 
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, texture)
- 
-    glColor3f(1.0,1.0,1.0)
-    glBegin (GL_QUADS)
-    glTexCoord2d(0.0,0.0); glVertex2d(0.0,0.0)
-    glTexCoord2d(1.0,0.0); glVertex2d(800.0,0.0)
-    glTexCoord2d(1.0,1.0); glVertex2d(800.0,600.0)
-    glTexCoord2d(0.0,1.0); glVertex2d(0.0,600.0)
-    glEnd()
-
-    glDisable(GL_TEXTURE_2D)
-    glEnable(GL_DEPTH_TEST)
-    glDepthMask(GL_TRUE)
-
-    glMatrixMode(GL_MODELVIEW)
-    glOrtho(0.0, 800.0, 600.0, 0.0, 0.0, 1.0)
+def planetsTouch(p1, p2):
+    dx = p1._st._x - p2._st._x
+    dy = p1._st._y - p2._st._y
+    dsq = dx*dx + dy*dy
+    dr = sqrt(dsq)
+    return dr<=(p1._r + p2._r)
 
 
 def main():
-    global RENDER_DISTANCE, FIELD_OF_VIEW, NEAR_CLIP_DISTANCE, \
-            FAR_CLIP_DISTANCE, NUM_BODIES, BACKGROUND_SPHERE_RADIUS
+    global NUM_BODIES, BACKGROUND_SPHERE_RADIUS
 
-    #TODO(mitch): make init method?
-
-    pygame.init()
-    display = (800,600)
-    pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
+    initialise()
     
-    glEnable(GL_DEPTH_TEST)
-    glDepthFunc(GL_ALWAYS)
-    
-    glMatrixMode(GL_PROJECTION)
-    gluPerspective(FIELD_OF_VIEW, (display[0] / display[1]), \
-            NEAR_CLIP_DISTANCE, FAR_CLIP_DISTANCE)
-    
-    #Starting view position
-    #glTranslatef(0,0, RENDER_DISTANCE / 2)
-
-    game_speed = 0.1
-    x_move = 0
-    y_move = 0
-    sphere_list = []
-    bodies = []
-
-    background = TextureFromImage(os.path.join("textures","bg.png"))
-
-    bodies.append(TextureFromImage(os.path.join("textures","planet1.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet2.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet3.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet4.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet5.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet6.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet7.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet8.png")))
-    bodies.append(TextureFromImage(os.path.join("textures","planet9.png")))
-
+    backgroundSphere = Sphere(TextureFromImage(os.path.join("textures", \
+            "bg.png")), 0, 0, 100000, 0)
 
     #generate spheres
-    #TODO(mitch): add in random chance for moon, add in clusters?
     for x in range(NUM_BODIES):
-        sphere_list.append(set_placement( \
-                bodies[random.randrange(0,len(bodies))], RENDER_DISTANCE))
+        sphere_list.append(Sphere())
+
+    blackhole = Sphere(TextureFromImage(os.path.join("textures", \
+            "bhole.png")), 0, 0, MAX_BODY_RADIUS, MAX_BODY_MASS)
+    blackhole._st._x, blackhole._st._y = 0, 0
+    blackhole._st._vx = blackhole._st._vy = 0.
+    blackhole._m *= 0.8
+    blackhole.setRadiusFromMass()
+    sphere_list.append(blackhole)
+
+    for p in sphere_list:
+        if p is blackhole:
+            continue
+        if planetsTouch(p, blackhole):
+            p._merged = True  # ignore planets inside the blackhole
     
-    #Sort spheres in order of their z-distance
-    #TODO(mitch): change to distance from cam?
-    sphere_list.sort(key=lambda x: x[2])
+    #Sort spheres in order of their z-distance for accurate overlaying
+    sphere_list.sort(key=lambda sphere: sphere._st._y)
+
+    #start position
+    glTranslatef(0, -5, -50)
 
     while True:
-        #resetDisplay(background)
-
         #Clear display
-        glClearColor(0.0,0.0,0.0,1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT )
+        glClearColor(.2, .2, .2, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
         
         #Get and react to user input
-        NewInput()
+        GetInput(sphere_list, blackhole)
 
-        #Draw background
-        Sphere([0, 0, 0, background, BACKGROUND_SPHERE_RADIUS])
+        #Toggle background
+        if not backgroundToggle:
+            backgroundSphere.drawSphere()
 
-        #Move spheres
-        glTranslatef(x_move,y_move,game_speed)
+        for p1 in sphere_list:
+            if p1._merged:
+                continue
+            for p2 in sphere_list:
+                if p1 is p2 or p2._merged:
+                    continue
+                if planetsTouch(p1, p2):
+                    if p1._m < p2._m:
+                        p1, p2 = p2, p1  # p1 is the biggest one (mass-wise)
+                    p2._merged = True
+                    p1._m += p2._m  # maintain the mass (just add them)
+                    p1.setRadiusFromMass()  # new mass --> new radius
+                    if p1 is blackhole:
+                        continue  # No-one can move the blackhole :-)
+                    newvx = (p1._st._vx*p1._m+p2._st._vx*p2._m)/(p1._m+p2._m)
+                    newvy = (p1._st._vy*p1._m+p2._st._vy*p2._m)/(p1._m+p2._m)
+                    p1._st._vx, p1._st._vy = newvx, newvy
 
         #Draw all spheres
-        for each_sphere in sphere_list:
-            Sphere(each_sphere)
+        for p in sphere_list:
+            if not p._merged:
+                p.drawSphere()
+                if p is not blackhole:
+                    p.updatePlanet(t, dt)
+            else:
+                sphere_list.remove(p)
+                sphere_list.append(Sphere())
+
+
+        #Sort spheres in order of their z-distance for accurate overlaying
+        sphere_list.sort(key=lambda sphere: sphere._st._y)
 
         #Flip display buffer
         pygame.display.flip()
